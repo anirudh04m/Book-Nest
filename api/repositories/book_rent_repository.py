@@ -54,29 +54,32 @@ class BookRentRepository(BaseRepository):
     def create_rent(customer_id: int, isbn: str) -> Dict[str, Any]:
         """Create a new book rental by ISBN (automatically selects an available copy)"""
         from ..database import get_db_connection
-        from .inventory_repository import InventoryRepository
         
-        # Get an available copy for this ISBN
-        available_copies = InventoryRepository.get_available_copies_by_isbn(isbn)
-        rentable_copies = [copy for copy in available_copies if copy.get('can_rent', 0) == 1]
-        
-        if not rentable_copies:
-            raise HTTPException(status_code=400, detail=f"No rentable copies available for ISBN {isbn}")
-        
-        # Use the first available copy
-        b_item_id = rentable_copies[0]['b_item_id']
-        
-        # Create rent record
+        # Create rent record in a single transaction to avoid race conditions
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
         try:
-            # Check if copy is available (with lock)
-            check_status_query = "SELECT status FROM BookCopy WHERE b_item_id = %s FOR UPDATE"
-            cursor.execute(check_status_query, (b_item_id,))
-            copy_status = cursor.fetchone()
-            if not copy_status or copy_status['status'] != 'available':
+            # Find and lock an available, rentable copy in one query
+            find_copy_query = """
+            SELECT b_item_id, status, can_rent
+            FROM BookCopy
+            WHERE isbn = %s AND status = 'available' AND can_rent = 1
+            LIMIT 1
+            FOR UPDATE
+            """
+            cursor.execute(find_copy_query, (isbn,))
+            copy_result = cursor.fetchone()
+            
+            if not copy_result:
+                raise HTTPException(status_code=400, detail=f"No rentable copies available for ISBN {isbn}")
+            
+            b_item_id = copy_result['b_item_id']
+            
+            # Double-check status (should be available since we just selected it)
+            if copy_result['status'] != 'available' or copy_result['can_rent'] != 1:
                 raise HTTPException(status_code=400, detail="Book copy is not available for rent")
             
+            # Create rent record
             insert_query = """
             INSERT INTO BookRent (customer_id, b_item_id, rent_date, due_date)
             VALUES (%s, %s, NOW(), DATE_ADD(NOW(), INTERVAL 2 WEEK))

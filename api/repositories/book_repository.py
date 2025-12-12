@@ -96,6 +96,23 @@ class BookRepository(BaseRepository):
         return BookRepository.execute_query(query, (isbn,))
     
     @staticmethod
+    def get_all_book_copies(isbn: str) -> List[Dict[str, Any]]:
+        """Get all book copies for a given ISBN (regardless of status)"""
+        query = """
+        SELECT 
+            bc.b_item_id,
+            bc.isbn,
+            bc.can_rent,
+            bc.status,
+            i.price,
+            i.description
+        FROM BookCopy bc
+        JOIN Item i ON bc.b_item_id = i.item_id
+        WHERE bc.isbn = %s
+        """
+        return BookRepository.execute_query(query, (isbn,))
+    
+    @staticmethod
     def get_books_for_ordering() -> List[Dict[str, Any]]:
         """Get books with available copies for ordering, grouped by ISBN"""
         query = """

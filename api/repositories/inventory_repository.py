@@ -8,15 +8,24 @@ class InventoryRepository(BaseRepository):
     """Repository for inventory and book copy management"""
     
     @staticmethod
-    def get_available_copies_by_isbn(isbn: str) -> List[Dict[str, Any]]:
-        """Get all available book copies for a given ISBN"""
-        query = """
-        SELECT bc.*, i.description, i.price
-        FROM BookCopy bc
-        JOIN Item i ON bc.b_item_id = i.item_id
-        WHERE bc.isbn = %s AND bc.status = 'available'
-        """
-        return InventoryRepository.execute_query(query, (isbn,))
+    def get_available_copies_by_isbn(isbn: str, can_rent: Optional[bool] = None) -> List[Dict[str, Any]]:
+        """Get all available book copies for a given ISBN, optionally filtered by can_rent"""
+        if can_rent is not None:
+            query = """
+            SELECT bc.*, i.description, i.price
+            FROM BookCopy bc
+            JOIN Item i ON bc.b_item_id = i.item_id
+            WHERE bc.isbn = %s AND bc.status = 'available' AND bc.can_rent = %s
+            """
+            return InventoryRepository.execute_query(query, (isbn, 1 if can_rent else 0))
+        else:
+            query = """
+            SELECT bc.*, i.description, i.price
+            FROM BookCopy bc
+            JOIN Item i ON bc.b_item_id = i.item_id
+            WHERE bc.isbn = %s AND bc.status = 'available'
+            """
+            return InventoryRepository.execute_query(query, (isbn,))
     
     @staticmethod
     def get_available_count_by_isbn(isbn: str) -> int:

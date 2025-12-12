@@ -155,7 +155,7 @@ export default function BookDetailPage() {
     );
   }
 
-  const availableCopies = copies.filter((c) => c.status === 'Available');
+  const availableCopies = copies.filter((c) => c.status === 'available');
   const averageRating =
     reviews.length > 0
       ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length

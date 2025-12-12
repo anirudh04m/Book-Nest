@@ -75,9 +75,8 @@ def get_book(isbn: str):
 
 @app.get("/api/py/books/{isbn}/copies")
 def get_book_copies(isbn: str):
-    """Get available copies of a book"""
-    copies = BookRepository.get_available_book_copies(isbn)
-    return copies
+    """Get all copies of a book (not just available ones)"""
+    return BookRepository.get_all_book_copies(isbn)
 
 @app.get("/api/py/books/search/{keyword}")
 def search_books(keyword: str):
