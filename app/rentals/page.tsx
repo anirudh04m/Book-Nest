@@ -256,7 +256,7 @@ export default function RentalsPage() {
                     {rental.book_title || `Book #${rental.b_item_id}`}
                   </h3>
                   <p className="text-gray-600">ISBN: {rental.isbn || 'N/A'}</p>
-                  <p className="text-gray-600">Customer: {rental.customer_name || `Customer #${rental.customer_name}`}</p>
+                  <p className="text-gray-600">Customer: {rental.customer_name || `Customer #${rental.customer_id}`}</p>
                   <p className="text-gray-600">
                     Rented: {new Date(rental.rent_date).toLocaleDateString()}
                   </p>
