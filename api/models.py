@@ -14,6 +14,20 @@ class Book(BookBase):
     class Config:
         from_attributes = True
 
+class BookCreate(BaseModel):
+    isbn: str
+    title: str
+    publication_year: int
+    publisher_id: int
+    category_id: int
+    author_first_name: str
+    author_last_name: str
+    author_initials: Optional[str] = None
+    author_role: str = "Author"
+    price: Optional[float] = None
+    can_rent: bool = False
+    inventory_id: Optional[int] = 1
+
 class BookDetail(BaseModel):
     isbn: str
     title: str

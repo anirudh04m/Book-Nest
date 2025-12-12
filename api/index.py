@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
 from .models import (
-    Book, BookDetail, Customer, CustomerCreate, Order, OrderCreate,
+    Book, BookDetail, BookCreate, Customer, CustomerCreate, Order, OrderCreate,
     OrderItem, Review, ReviewCreate, BookRent, BookRentCreate,
     Item, Author, Category, Merchandise
 )
@@ -14,6 +14,7 @@ from .repositories.book_rent_repository import BookRentRepository
 from .repositories.item_repository import ItemRepository
 from .repositories.category_repository import CategoryRepository
 from .repositories.author_repository import AuthorRepository
+from .repositories.publisher_repository import PublisherRepository
 
 app = FastAPI(docs_url="/api/py/docs", openapi_url="/api/py/openapi.json")
 
@@ -44,6 +45,21 @@ def get_book(isbn: str):
 def search_books(keyword: str):
     """Search books by title or author name"""
     return BookRepository.search_books(keyword)
+
+@app.post("/api/py/books", response_model=BookDetail)
+def create_book(book: BookCreate):
+    """Create a new book with author information"""
+    book_data = book.dict()
+    new_book = BookRepository.create_book(book_data)
+    if not new_book:
+        raise HTTPException(status_code=500, detail="Failed to create book")
+    return new_book
+
+# Publishers Endpoints
+@app.get("/api/py/publishers")
+def get_publishers():
+    """Get all publishers"""
+    return PublisherRepository.get_all_publishers()
 
 # Customers Endpoints
 @app.get("/api/py/customers", response_model=List[Customer])

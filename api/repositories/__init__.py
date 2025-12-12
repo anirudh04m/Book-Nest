@@ -7,6 +7,7 @@ from .book_rent_repository import BookRentRepository
 from .item_repository import ItemRepository
 from .category_repository import CategoryRepository
 from .author_repository import AuthorRepository
+from .publisher_repository import PublisherRepository
 
 __all__ = [
     'BookRepository',
@@ -17,5 +18,6 @@ __all__ = [
     'ItemRepository',
     'CategoryRepository',
     'AuthorRepository',
+    'PublisherRepository',
 ]
 
