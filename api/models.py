@@ -81,6 +81,7 @@ class OrderItem(BaseModel):
     item_id: int
     description: Optional[str] = None
     price: Optional[float] = None
+    quantity: Optional[int] = 1
 
 class Order(BaseModel):
     order_id: int
@@ -126,6 +127,11 @@ class BookRent(BaseModel):
     return_date: Optional[date] = None
     customer_id: int
     b_item_id: int
+    book_title: Optional[str] = None
+    isbn: Optional[str] = None
+    customer_name: Optional[str] = None
+    class Config:
+        from_attributes = True
 
 # Author Models
 class Author(BaseModel):

@@ -39,6 +39,7 @@ class OrderRepository(BaseRepository):
         query = """
         SELECT 
             oi.order_item_id,
+            oi.order_id,
             oi.item_id,
             i.description,
             i.price,
@@ -54,6 +55,9 @@ class OrderRepository(BaseRepository):
         """
         items = OrderRepository.execute_query(query, (order_id,))
         
+        if not items:
+            return []
+        
         # Group books by ISBN and count quantities
         from collections import defaultdict
         grouped_items = []
@@ -61,26 +65,33 @@ class OrderRepository(BaseRepository):
         other_items = []
         
         for item in items:
-            if item['item_type'] == 'Book' and item['isbn']:
+            if item.get('item_type') == 'Book' and item.get('isbn'):
                 isbn = item['isbn']
                 book_groups[isbn]['quantity'] += 1
-                book_groups[isbn]['price'] = float(item['price'])
-                book_groups[isbn]['title'] = item['book_title'] or item['description']
+                book_groups[isbn]['price'] = float(item.get('price', 0))
+                book_groups[isbn]['title'] = item.get('book_title') or item.get('description', 'Unknown Book')
                 book_groups[isbn]['isbn'] = isbn
             else:
-                other_items.append(item)
+                # For non-book items, add quantity field and ensure order_id is present
+                item_with_qty = dict(item)
+                item_with_qty['quantity'] = 1
+                if 'order_id' not in item_with_qty:
+                    item_with_qty['order_id'] = order_id
+                other_items.append(item_with_qty)
         
         # Add grouped books
         for isbn, group in book_groups.items():
-            grouped_items.append({
-                'order_item_id': 0,  # Not applicable for grouped items
-                'item_id': 0,
-                'description': f"{group['title']} (ISBN: {isbn})",
-                'price': group['price'],
-                'quantity': group['quantity'],
-                'item_type': 'Book',
-                'isbn': isbn
-            })
+            if group['quantity'] > 0:
+                grouped_items.append({
+                    'order_item_id': 0,  # Not applicable for grouped items
+                    'order_id': order_id,  # Required field
+                    'item_id': 0,
+                    'description': f"{group['title']} (ISBN: {isbn})",
+                    'price': group['price'],
+                    'quantity': group['quantity'],
+                    'item_type': 'Book',
+                    'isbn': isbn
+                })
         
         # Add other items
         grouped_items.extend(other_items)

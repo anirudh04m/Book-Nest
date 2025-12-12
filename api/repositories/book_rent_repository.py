@@ -12,28 +12,40 @@ class BookRentRepository(BaseRepository):
         if customer_id:
             query = """
             SELECT 
-                br.*,
-                b.title AS book_title,
-                b.isbn,
+                br.book_rent_id,
+                br.rent_date,
+                br.due_date,
+                br.return_date,
+                br.customer_id,
+                br.b_item_id,
+                COALESCE(b.title, i.description) AS book_title,
+                COALESCE(b.isbn, bc.isbn) AS isbn,
                 CONCAT(c.first_name, ' ', c.last_name) AS customer_name
             FROM BookRent br
-            JOIN BookCopy bc ON br.b_item_id = bc.b_item_id
-            JOIN Book b ON bc.isbn = b.isbn
-            JOIN Customer c ON br.customer_id = c.customer_id
+            LEFT JOIN BookCopy bc ON br.b_item_id = bc.b_item_id
+            LEFT JOIN Book b ON bc.isbn = b.isbn
+            LEFT JOIN Item i ON br.b_item_id = i.item_id
+            LEFT JOIN Customer c ON br.customer_id = c.customer_id
             WHERE br.customer_id = %s
             ORDER BY br.rent_date DESC
             """
             return BookRentRepository.execute_query(query, (customer_id,))
         query = """
         SELECT 
-            br.*,
-            b.title AS book_title,
-            b.isbn,
+            br.book_rent_id,
+            br.rent_date,
+            br.due_date,
+            br.return_date,
+            br.customer_id,
+            br.b_item_id,
+            COALESCE(b.title, i.description) AS book_title,
+            COALESCE(b.isbn, bc.isbn) AS isbn,
             CONCAT(c.first_name, ' ', c.last_name) AS customer_name
         FROM BookRent br
-        JOIN BookCopy bc ON br.b_item_id = bc.b_item_id
-        JOIN Book b ON bc.isbn = b.isbn
-        JOIN Customer c ON br.customer_id = c.customer_id
+        LEFT JOIN BookCopy bc ON br.b_item_id = bc.b_item_id
+        LEFT JOIN Book b ON bc.isbn = b.isbn
+        LEFT JOIN Item i ON br.b_item_id = i.item_id
+        LEFT JOIN Customer c ON br.customer_id = c.customer_id
         ORDER BY br.rent_date DESC
         """
         return BookRentRepository.execute_query(query)
