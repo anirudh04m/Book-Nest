@@ -8,58 +8,104 @@ class BookRentRepository(BaseRepository):
     
     @staticmethod
     def get_all_rents(customer_id: Optional[int] = None) -> List[Dict[str, Any]]:
-        """Get all book rentals, optionally filtered by customer_id"""
+        """Get all book rentals with book and customer details"""
         if customer_id:
-            query = "SELECT * FROM BookRent WHERE customer_id = %s ORDER BY rent_date DESC"
+            query = """
+            SELECT 
+                br.*,
+                b.title AS book_title,
+                b.isbn,
+                CONCAT(c.first_name, ' ', c.last_name) AS customer_name
+            FROM BookRent br
+            JOIN BookCopy bc ON br.b_item_id = bc.b_item_id
+            JOIN Book b ON bc.isbn = b.isbn
+            JOIN Customer c ON br.customer_id = c.customer_id
+            WHERE br.customer_id = %s
+            ORDER BY br.rent_date DESC
+            """
             return BookRentRepository.execute_query(query, (customer_id,))
-        query = "SELECT * FROM BookRent ORDER BY rent_date DESC"
+        query = """
+        SELECT 
+            br.*,
+            b.title AS book_title,
+            b.isbn,
+            CONCAT(c.first_name, ' ', c.last_name) AS customer_name
+        FROM BookRent br
+        JOIN BookCopy bc ON br.b_item_id = bc.b_item_id
+        JOIN Book b ON bc.isbn = b.isbn
+        JOIN Customer c ON br.customer_id = c.customer_id
+        ORDER BY br.rent_date DESC
+        """
         return BookRentRepository.execute_query(query)
     
     @staticmethod
-    def create_rent(customer_id: int, b_item_id: int) -> Dict[str, Any]:
-        """Create a new book rental"""
+    def create_rent(customer_id: int, isbn: str) -> Dict[str, Any]:
+        """Create a new book rental by ISBN (automatically selects an available copy)"""
         from ..database import get_db_connection
-        # Check if book is available for rent
-        check_query = "SELECT can_rent FROM BookCopy WHERE b_item_id = %s"
-        results = BookRentRepository.execute_query(check_query, (b_item_id,))
-        if not results or not results[0]['can_rent']:
-            raise HTTPException(status_code=400, detail="Book cannot be rented")
+        from .inventory_repository import InventoryRepository
         
-        # Check if book is currently rented
-        status_query = """
-        SELECT return_date FROM BookRent 
-        WHERE b_item_id = %s 
-        ORDER BY rent_date DESC
-        LIMIT 1
-        """
-        rent_status = BookRentRepository.execute_query(status_query, (b_item_id,))
-        if rent_status and rent_status[0]['return_date'] is None:
-            raise HTTPException(status_code=400, detail="Book is currently rented")
+        # Get an available copy for this ISBN
+        available_copies = InventoryRepository.get_available_copies_by_isbn(isbn)
+        rentable_copies = [copy for copy in available_copies if copy.get('can_rent', 0) == 1]
+        
+        if not rentable_copies:
+            raise HTTPException(status_code=400, detail=f"No rentable copies available for ISBN {isbn}")
+        
+        # Use the first available copy
+        b_item_id = rentable_copies[0]['b_item_id']
         
         # Create rent record
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
         try:
+            # Check if copy is available (with lock)
+            check_status_query = "SELECT status FROM BookCopy WHERE b_item_id = %s FOR UPDATE"
+            cursor.execute(check_status_query, (b_item_id,))
+            copy_status = cursor.fetchone()
+            if not copy_status or copy_status['status'] != 'available':
+                raise HTTPException(status_code=400, detail="Book copy is not available for rent")
+            
             insert_query = """
             INSERT INTO BookRent (customer_id, b_item_id, rent_date, due_date)
             VALUES (%s, %s, NOW(), DATE_ADD(NOW(), INTERVAL 2 WEEK))
             """
             cursor.execute(insert_query, (customer_id, b_item_id))
             rent_id = cursor.lastrowid
+            
+            # Update BookCopy status to 'rented'
+            update_status_query = "UPDATE BookCopy SET status = 'rented' WHERE b_item_id = %s"
+            cursor.execute(update_status_query, (b_item_id,))
+            
             conn.commit()
             
-            # Get the newly created rent record
-            get_query = "SELECT * FROM BookRent WHERE book_rent_id = %s"
+            # Get the newly created rent record with book details
+            get_query = """
+            SELECT 
+                br.*,
+                b.title AS book_title,
+                b.isbn,
+                CONCAT(c.first_name, ' ', c.last_name) AS customer_name
+            FROM BookRent br
+            JOIN BookCopy bc ON br.b_item_id = bc.b_item_id
+            JOIN Book b ON bc.isbn = b.isbn
+            JOIN Customer c ON br.customer_id = c.customer_id
+            WHERE br.book_rent_id = %s
+            """
             cursor.execute(get_query, (rent_id,))
             new_rent = cursor.fetchone()
             cursor.close()
             conn.close()
             return new_rent
-        except Exception as e:
+        except HTTPException:
             conn.rollback()
             cursor.close()
             conn.close()
             raise
+        except Exception as e:
+            conn.rollback()
+            cursor.close()
+            conn.close()
+            raise HTTPException(status_code=500, detail=f"Error creating rent: {str(e)}")
     
     @staticmethod
     def return_book(rent_id: int) -> Dict[str, Any]:
@@ -68,12 +114,27 @@ class BookRentRepository(BaseRepository):
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
         try:
+            # Get the b_item_id before updating
+            get_query = "SELECT b_item_id FROM BookRent WHERE book_rent_id = %s"
+            cursor.execute(get_query, (rent_id,))
+            rent_record = cursor.fetchone()
+            if not rent_record:
+                raise HTTPException(status_code=404, detail="Rent record not found")
+            
+            b_item_id = rent_record['b_item_id']
+            
+            # Update rent record
             query = """
             UPDATE BookRent 
             SET return_date = NOW()
             WHERE book_rent_id = %s
             """
             cursor.execute(query, (rent_id,))
+            
+            # Update BookCopy status back to 'available'
+            update_status_query = "UPDATE BookCopy SET status = 'available' WHERE b_item_id = %s"
+            cursor.execute(update_status_query, (b_item_id,))
+            
             conn.commit()
             
             # Get the updated rent record

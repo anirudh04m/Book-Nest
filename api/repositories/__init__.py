@@ -8,6 +8,9 @@ from .item_repository import ItemRepository
 from .category_repository import CategoryRepository
 from .author_repository import AuthorRepository
 from .publisher_repository import PublisherRepository
+from .statistics_repository import StatisticsRepository
+from .promotion_repository import PromotionRepository
+from .inventory_repository import InventoryRepository
 
 __all__ = [
     'BookRepository',
@@ -19,5 +22,8 @@ __all__ = [
     'CategoryRepository',
     'AuthorRepository',
     'PublisherRepository',
+    'StatisticsRepository',
+    'PromotionRepository',
+    'InventoryRepository',
 ]
 

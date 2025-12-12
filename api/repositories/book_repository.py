@@ -79,6 +79,65 @@ class BookRepository(BaseRepository):
         return BookRepository.execute_query(query, (keyword_pattern, keyword_pattern, keyword_pattern))
     
     @staticmethod
+    def get_available_book_copies(isbn: str) -> List[Dict[str, Any]]:
+        """Get available book copies that can be rented or ordered"""
+        query = """
+        SELECT 
+            bc.b_item_id,
+            bc.isbn,
+            bc.can_rent,
+            bc.status,
+            i.price,
+            i.description
+        FROM BookCopy bc
+        JOIN Item i ON bc.b_item_id = i.item_id
+        WHERE bc.isbn = %s AND bc.status = 'available'
+        """
+        return BookRepository.execute_query(query, (isbn,))
+    
+    @staticmethod
+    def get_books_for_ordering() -> List[Dict[str, Any]]:
+        """Get books with available copies for ordering, grouped by ISBN"""
+        query = """
+        SELECT 
+            b.isbn,
+            b.title,
+            CONCAT(a.author_first_name, ' ', a.author_last_name) AS author_name,
+            COUNT(bc.b_item_id) AS available_copies,
+            MIN(i.price) AS price
+        FROM Book b
+        JOIN Wrote w ON b.isbn = w.isbn
+        JOIN Author a ON w.author_id = a.author_id
+        JOIN BookCopy bc ON b.isbn = bc.isbn
+        JOIN Item i ON bc.b_item_id = i.item_id
+        WHERE bc.status = 'available'
+        GROUP BY b.isbn, b.title, a.author_first_name, a.author_last_name
+        HAVING available_copies > 0
+        ORDER BY b.title
+        """
+        return BookRepository.execute_query(query)
+    
+    @staticmethod
+    def get_books_for_renting() -> List[Dict[str, Any]]:
+        """Get books with available copies for renting, grouped by ISBN"""
+        query = """
+        SELECT 
+            b.isbn,
+            b.title,
+            CONCAT(a.author_first_name, ' ', a.author_last_name) AS author_name,
+            COUNT(bc.b_item_id) AS available_copies
+        FROM Book b
+        JOIN Wrote w ON b.isbn = w.isbn
+        JOIN Author a ON w.author_id = a.author_id
+        JOIN BookCopy bc ON b.isbn = bc.isbn
+        WHERE bc.status = 'available' AND bc.can_rent = 1
+        GROUP BY b.isbn, b.title, a.author_first_name, a.author_last_name
+        HAVING available_copies > 0
+        ORDER BY b.title
+        """
+        return BookRepository.execute_query(query)
+    
+    @staticmethod
     def create_book(book_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Create a new book with author, and optionally create Item and BookCopy.
@@ -104,6 +163,9 @@ class BookRepository(BaseRepository):
             cursor.execute(check_query, (book_data['isbn'],))
             if cursor.fetchone():
                 raise HTTPException(status_code=400, detail=f"Book with ISBN {book_data['isbn']} already exists")
+            
+            # Use publisher_id directly (from dropdown selection)
+            publisher_id = book_data['publisher_id']
             
             # Find or create author
             author_query = """
@@ -138,7 +200,7 @@ class BookRepository(BaseRepository):
                 book_data['isbn'],
                 book_data['title'],
                 book_data['publication_year'],
-                book_data['publisher_id'],
+                publisher_id,
                 book_data['category_id']
             ))
             
@@ -163,15 +225,56 @@ class BookRepository(BaseRepository):
                 cursor.execute(insert_item_query, (book_data['title'], book_data['price']))
                 item_id = cursor.lastrowid
                 
+                # Get or create inventory_id
+                inventory_id = book_data.get('inventory_id')
+                if inventory_id:
+                    # Check if inventory exists
+                    check_inventory_query = "SELECT inventory_id FROM Inventory WHERE inventory_id = %s"
+                    cursor.execute(check_inventory_query, (inventory_id,))
+                    if not cursor.fetchone():
+                        # Inventory doesn't exist, find or create a default one
+                        inventory_id = None
+                
+                if not inventory_id:
+                    # Find any existing inventory
+                    find_inventory_query = "SELECT inventory_id FROM Inventory LIMIT 1"
+                    cursor.execute(find_inventory_query)
+                    inventory_result = cursor.fetchone()
+                    
+                    if inventory_result:
+                        inventory_id = inventory_result['inventory_id']
+                    else:
+                        # No inventory exists, create a default one
+                        # First, check if there's an employee
+                        find_employee_query = "SELECT employee_id FROM Employee LIMIT 1"
+                        cursor.execute(find_employee_query)
+                        employee_result = cursor.fetchone()
+                        
+                        if employee_result:
+                            employee_id = employee_result['employee_id']
+                        else:
+                            # Create a default employee first
+                            insert_employee_query = """
+                            INSERT INTO Employee (emp_first_name, emp_last_name, start_date)
+                            VALUES (%s, %s, CURDATE())
+                            """
+                            cursor.execute(insert_employee_query, ('System', 'Admin'))
+                            employee_id = cursor.lastrowid
+                        
+                        # Create default inventory
+                        insert_inventory_query = "INSERT INTO Inventory (employee_id) VALUES (%s)"
+                        cursor.execute(insert_inventory_query, (employee_id,))
+                        inventory_id = cursor.lastrowid
+                
                 # Create BookCopy
                 insert_bookcopy_query = """
-                INSERT INTO BookCopy (b_item_id, isbn, inventory_id, can_rent)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO BookCopy (b_item_id, isbn, inventory_id, can_rent, status)
+                VALUES (%s, %s, %s, %s, 'available')
                 """
                 cursor.execute(insert_bookcopy_query, (
                     item_id,
                     book_data['isbn'],
-                    book_data.get('inventory_id', 1),
+                    inventory_id,
                     1 if book_data.get('can_rent', False) else 0
                 ))
             
@@ -189,4 +292,3 @@ class BookRepository(BaseRepository):
         finally:
             cursor.close()
             conn.close()
-

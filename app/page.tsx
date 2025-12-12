@@ -8,6 +8,21 @@ export default function Home() {
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
           <Link
+            href="/dashboard"
+            className="group rounded-lg border border-gray-300 px-5 py-4 transition-colors hover:border-gray-400 hover:bg-gray-50 bg-white"
+          >
+            <h2 className="mb-3 text-2xl font-semibold text-gray-900">
+              Dashboard{" "}
+              <span className="inline-block transition-transform group-hover:translate-x-1">
+                -&gt;
+              </span>
+            </h2>
+            <p className="m-0 max-w-[30ch] text-sm text-gray-600">
+              View statistics and overview
+            </p>
+          </Link>
+
+          <Link
             href="/books"
             className="group rounded-lg border border-gray-300 px-5 py-4 transition-colors hover:border-gray-400 hover:bg-gray-50 bg-white"
           >
@@ -34,6 +49,36 @@ export default function Home() {
             </h2>
             <p className="m-0 max-w-[30ch] text-sm text-gray-600">
               View all customer orders
+            </p>
+          </Link>
+
+          <Link
+            href="/orders/create"
+            className="group rounded-lg border border-gray-300 px-5 py-4 transition-colors hover:border-gray-400 hover:bg-gray-50 bg-white"
+          >
+            <h2 className="mb-3 text-2xl font-semibold text-gray-900">
+              Create Order{" "}
+              <span className="inline-block transition-transform group-hover:translate-x-1">
+                -&gt;
+              </span>
+            </h2>
+            <p className="m-0 max-w-[30ch] text-sm text-gray-600">
+              Create a new customer order
+            </p>
+          </Link>
+
+          <Link
+            href="/rentals"
+            className="group rounded-lg border border-gray-300 px-5 py-4 transition-colors hover:border-gray-400 hover:bg-gray-50 bg-white"
+          >
+            <h2 className="mb-3 text-2xl font-semibold text-gray-900">
+              Rentals{" "}
+              <span className="inline-block transition-transform group-hover:translate-x-1">
+                -&gt;
+              </span>
+            </h2>
+            <p className="m-0 max-w-[30ch] text-sm text-gray-600">
+              Manage book rentals and returns
             </p>
           </Link>
 

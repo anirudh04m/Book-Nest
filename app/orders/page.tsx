@@ -8,6 +8,9 @@ interface OrderItem {
   item_id: number;
   description: string;
   price: number;
+  quantity?: number;
+  isbn?: string;
+  item_type?: string;
 }
 
 interface Order {
@@ -71,12 +74,19 @@ export default function OrdersPage() {
             <div className="mt-4">
               <h3 className="font-semibold mb-2 text-gray-900">Items:</h3>
               <ul className="space-y-2">
-                {order.items.map((item) => (
-                  <li key={item.order_item_id} className="flex justify-between text-gray-700">
-                    <span>{item.description || `Item #${item.item_id}`}</span>
-                    <span>${item.price.toFixed(2)}</span>
-                  </li>
-                ))}
+                {order.items.map((item, index) => {
+                  const quantity = item.quantity || 1;
+                  const totalPrice = item.price * quantity;
+                  return (
+                    <li key={item.order_item_id || index} className="flex justify-between text-gray-700">
+                      <span>
+                        {item.description || `Item #${item.item_id}`}
+                        {quantity > 1 && <span className="text-gray-500 ml-2">(x{quantity})</span>}
+                      </span>
+                      <span>${totalPrice.toFixed(2)}</span>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           </div>

@@ -14,11 +14,22 @@ class Book(BookBase):
     class Config:
         from_attributes = True
 
+class PublisherCreate(BaseModel):
+    publisher_name: str
+    publisher_city: Optional[str] = None
+
+class Publisher(BaseModel):
+    publisher_id: int
+    publisher_name: str
+    publisher_city: Optional[str] = None
+    class Config:
+        from_attributes = True
+
 class BookCreate(BaseModel):
     isbn: str
     title: str
     publication_year: int
-    publisher_id: int
+    publisher_id: int  # Back to publisher_id for dropdown
     category_id: int
     author_first_name: str
     author_last_name: str
@@ -55,7 +66,9 @@ class Customer(CustomerBase):
 
 # Order Models
 class OrderItemCreate(BaseModel):
-    item_id: int
+    item_id: Optional[int] = None  # For non-book items
+    isbn: Optional[str] = None  # For books
+    quantity: int = 1
 
 class OrderCreate(BaseModel):
     customer_id: int
@@ -103,7 +116,8 @@ class Review(BaseModel):
 # BookRent Models
 class BookRentCreate(BaseModel):
     customer_id: int
-    b_item_id: int
+    b_item_id: Optional[int] = None  # For backward compatibility
+    isbn: Optional[str] = None  # Preferred: use ISBN to auto-select available copy
 
 class BookRent(BaseModel):
     book_rent_id: int
